@@ -66,24 +66,34 @@
         <button class="btn btn-purple" onclick="generateReport()">Generate Report</button>
     </div>
 
-    <!-- Filters and Search -->
+    <!-- View Toggle and Filters -->
     <div class="filters-section">
         <div class="filter-left">
-            <h2>Preventive Maintenance (PPM)</h2>
+            <div class="view-toggle">
+                <button id="ppmViewBtn" class="toggle-btn active" onclick="switchView('ppm')">📅 PPM Tasks</button>
+                <button id="cmViewBtn" class="toggle-btn" onclick="switchView('cm')">🔧 CM Tasks</button>
+            </div>
         </div>
         <div class="filter-right">
-            <select id="shiftFilter" class="filter-select" onchange="filterTasks()">
+            <select id="shiftFilter" class="filter-select" onchange="filterTasks()" style="display: none;">
                 <option value="All">All Shifts</option>
                 <option value="A">Shift A</option>
                 <option value="B">Shift B</option>
                 <option value="C">Shift C</option>
             </select>
+            <select id="cmStatusFilter" class="filter-select" onchange="filterCMTasks()" style="display: none;">
+                <option value="All">All Status</option>
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Pending Parts">Pending Parts</option>
+                <option value="Resolved">Resolved</option>
+            </select>
             <input type="text" id="searchInput" class="search-input" placeholder="Search tasks..." oninput="filterTasks()">
         </div>
     </div>
 
-    <!-- Tasks Table -->
-    <div class="tasks-container">
+    <!-- PPM Tasks Table -->
+    <div id="ppmTasksContainer" class="tasks-container">
         <table class="tasks-table">
             <thead>
                 <tr>
@@ -100,7 +110,29 @@
                 </tr>
             </thead>
             <tbody id="tasksTableBody">
-                <!-- Tasks will be loaded here dynamically -->
+                <!-- PPM Tasks will be loaded here dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- CM Tasks Table -->
+    <div id="cmTasksContainer" class="tasks-container" style="display: none;">
+        <table class="tasks-table">
+            <thead>
+                <tr>
+                    <th>WORK ORDER</th>
+                    <th>DESCRIPTION</th>
+                    <th>PRIORITY</th>
+                    <th>LOCATION</th>
+                    <th>REPORTED BY</th>
+                    <th>DATE REPORTED</th>
+                    <th>STATUS</th>
+                    <th>ASSIGNED TO</th>
+                    <th>ACTION</th>
+                </tr>
+            </thead>
+            <tbody id="cmTasksTableBody">
+                <!-- CM Tasks will be loaded here dynamically -->
             </tbody>
         </table>
     </div>
@@ -194,6 +226,10 @@
             </div>
             <form id="cmForm" onsubmit="addCMTask(event)">
                 <div class="form-group">
+                    <label>Work Order #</label>
+                    <input type="text" id="cmWorkOrder" placeholder="WO-12345" required>
+                </div>
+                <div class="form-group">
                     <label>Issue Description</label>
                     <textarea id="cmDescription" rows="3" required></textarea>
                 </div>
@@ -209,7 +245,24 @@
                 </div>
                 <div class="form-group">
                     <label>Location</label>
-                    <input type="text" id="cmLocation" required>
+                    <input type="text" id="cmLocation" placeholder="Runway, Taxiway, Apron, etc." required>
+                </div>
+                <div class="form-group">
+                    <label>Reported By</label>
+                    <input type="text" id="cmReportedBy" placeholder="Name..." required>
+                </div>
+                <div class="form-group">
+                    <label>Date Reported</label>
+                    <input type="date" id="cmDateReported" required>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="cmStatus" required>
+                        <option value="Open">Open</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Pending Parts">Pending Parts</option>
+                        <option value="Resolved">Resolved</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Assigned To</label>

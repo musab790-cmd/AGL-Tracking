@@ -318,24 +318,52 @@ function formatDate(dateString) {
 
 // Filter Tasks
 function filterTasks() {
-    const shiftFilter = document.getElementById('shiftFilter').value;
+    if (currentView === 'ppm') {
+        const shiftFilter = document.getElementById('shiftFilter').value;
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        
+        let filtered = ppmTasks;
+        
+        if (shiftFilter !== 'All') {
+            filtered = filtered.filter(task => task.shiftType === shiftFilter);
+        }
+        
+        if (searchTerm) {
+            filtered = filtered.filter(task => 
+                (task.description || '').toLowerCase().includes(searchTerm) ||
+                (task.type || '').toLowerCase().includes(searchTerm) ||
+                (task.status || '').toLowerCase().includes(searchTerm)
+            );
+        }
+        
+        renderTasks(filtered);
+    } else {
+        filterCMTasks();
+    }
+}
+
+// Filter CM Tasks
+function filterCMTasks() {
+    const statusFilter = document.getElementById('cmStatusFilter').value;
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     
-    let filtered = ppmTasks;
+    let filtered = cmTasks;
     
-    if (shiftFilter !== 'All') {
-        filtered = filtered.filter(task => task.shiftType === shiftFilter);
+    if (statusFilter !== 'All') {
+        filtered = filtered.filter(task => task.status === statusFilter);
     }
     
     if (searchTerm) {
         filtered = filtered.filter(task => 
+            (task.workOrder || '').toLowerCase().includes(searchTerm) ||
             (task.description || '').toLowerCase().includes(searchTerm) ||
-            (task.type || '').toLowerCase().includes(searchTerm) ||
-            (task.status || '').toLowerCase().includes(searchTerm)
+            (task.location || '').toLowerCase().includes(searchTerm) ||
+            (task.reportedBy || '').toLowerCase().includes(searchTerm) ||
+            (task.assignedTo || '').toLowerCase().includes(searchTerm)
         );
     }
     
-    renderTasks(filtered);
+    renderCMTasks(filtered);
 }
 
 // Modal Functions
@@ -358,6 +386,11 @@ function closeAddPPMModal() {
 
 function openAddCMModal() {
     document.getElementById('addCMModal').style.display = 'block';
+    document.getElementById('cmForm').reset();
+    // Set today's date as default for date reported
+    document.getElementById('cmDateReported').value = new Date().toISOString().split('T')[0];
+    // Set default status to Open
+    document.getElementById('cmStatus').value = 'Open';
 }
 
 function closeAddCMModal() {
@@ -517,22 +550,34 @@ function addPPMTask(event) {
 function addCMTask(event) {
     event.preventDefault();
     
+    const dateReported = document.getElementById('cmDateReported').value;
+    
+    if (!isValidDate(dateReported)) {
+        showNotification('Please enter a valid date', 'error');
+        return;
+    }
+    
     const cmTask = {
         id: Date.now(),
         workOrder: document.getElementById('cmWorkOrder').value,
         description: document.getElementById('cmDescription').value,
         reportedBy: document.getElementById('cmReportedBy').value,
-        dateReported: document.getElementById('cmDateReported').value,
+        dateReported: dateReported,
         status: document.getElementById('cmStatus').value,
         assignedTo: document.getElementById('cmAssignedTo').value,
-        priority: document.getElementById('cmPriority').value
+        priority: document.getElementById('cmPriority').value,
+        location: document.getElementById('cmLocation').value,
+        createdDate: new Date().toISOString()
     };
     
     cmTasks.unshift(cmTask);
     saveData();
     updateDashboard();
-    showNotification('CM task added successfully!', 'success');
+    showNotification('CM task added successfully! Work Order: ' + cmTask.workOrder, 'success');
     closeAddCMModal();
+    
+    // Reset form
+    document.getElementById('cmForm').reset();
 }
 
 // Show History Function
