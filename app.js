@@ -12,11 +12,16 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDashboard();
     renderTasks();
     
+    // Show shift filter by default (PPM view)
+    document.getElementById('shiftFilter').style.display = 'inline-block';
+    document.getElementById('cmStatusFilter').style.display = 'none';
+    
     // Event Listeners
     document.getElementById('ppmForm').addEventListener('submit', addPPMTask);
     document.getElementById('cmForm').addEventListener('submit', addCMTask);
     document.getElementById('searchInput').addEventListener('input', filterTasks);
     document.getElementById('shiftFilter').addEventListener('change', filterTasks);
+    document.getElementById('cmStatusFilter').addEventListener('change', filterCMTasks);
     document.getElementById('photoInput').addEventListener('change', handlePhotoUpload);
     
     // Initialize Microsoft Teams (with error handling)
@@ -89,14 +94,24 @@ function updateDashboard() {
         task.status === 'In Progress'
     ).length;
     
+    // Count all unresolved CM tasks (Open + In Progress + Pending Parts)
     const openCMCount = cmTasks.filter(task => 
-        task.status === 'Open'
+        task.status === 'Open' || task.status === 'In Progress' || task.status === 'Pending Parts'
     ).length;
     
     document.getElementById('tasksDueToday').textContent = dueTodayCount;
     document.getElementById('overdueTasks').textContent = overdueCount;
     document.getElementById('inProgressTasks').textContent = inProgressCount;
     document.getElementById('openCMTasks').textContent = openCMCount;
+    
+    // Log for debugging
+    console.log('Dashboard updated:', {
+        dueTodayCount,
+        overdueCount,
+        inProgressCount,
+        openCMCount,
+        totalCMTasks: cmTasks.length
+    });
 }
 
 // Get Smart Status with Color Logic
@@ -557,23 +572,51 @@ function addCMTask(event) {
         return;
     }
     
-    const cmTask = {
-        id: Date.now(),
-        workOrder: document.getElementById('cmWorkOrder').value,
-        description: document.getElementById('cmDescription').value,
-        reportedBy: document.getElementById('cmReportedBy').value,
-        dateReported: dateReported,
-        status: document.getElementById('cmStatus').value,
-        assignedTo: document.getElementById('cmAssignedTo').value,
-        priority: document.getElementById('cmPriority').value,
-        location: document.getElementById('cmLocation').value,
-        createdDate: new Date().toISOString()
-    };
+    if (window.currentEditingCMTaskId) {
+        // Editing existing CM task
+        const taskIndex = cmTasks.findIndex(t => t.id === window.currentEditingCMTaskId);
+        if (taskIndex !== -1) {
+            cmTasks[taskIndex] = {
+                id: window.currentEditingCMTaskId,
+                workOrder: document.getElementById('cmWorkOrder').value,
+                description: document.getElementById('cmDescription').value,
+                reportedBy: document.getElementById('cmReportedBy').value,
+                dateReported: dateReported,
+                status: document.getElementById('cmStatus').value,
+                assignedTo: document.getElementById('cmAssignedTo').value,
+                priority: document.getElementById('cmPriority').value,
+                location: document.getElementById('cmLocation').value,
+                createdDate: cmTasks[taskIndex].createdDate,
+                lastModified: new Date().toISOString()
+            };
+            showNotification('CM task updated successfully!', 'success');
+        }
+        window.currentEditingCMTaskId = null;
+    } else {
+        // Adding new CM task
+        const cmTask = {
+            id: Date.now(),
+            workOrder: document.getElementById('cmWorkOrder').value,
+            description: document.getElementById('cmDescription').value,
+            reportedBy: document.getElementById('cmReportedBy').value,
+            dateReported: dateReported,
+            status: document.getElementById('cmStatus').value,
+            assignedTo: document.getElementById('cmAssignedTo').value,
+            priority: document.getElementById('cmPriority').value,
+            location: document.getElementById('cmLocation').value,
+            createdDate: new Date().toISOString()
+        };
+        
+        cmTasks.unshift(cmTask);
+        showNotification('CM task added successfully! Work Order: ' + cmTask.workOrder, 'success');
+    }
     
-    cmTasks.unshift(cmTask);
     saveData();
     updateDashboard();
-    showNotification('CM task added successfully! Work Order: ' + cmTask.workOrder, 'success');
+    
+    // Auto-switch to CM view to show the newly added/edited task
+    switchView('cm');
+    
     closeAddCMModal();
     
     // Reset form
