@@ -1,0 +1,60 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "agl-maintenance-tracker-app",
+  "packageName": "com.agl.maintenancetracker",
+  "developer": {
+    "name": "AGL Aviation",
+    "websiteUrl": "https://www.agl-aviation.com",
+    "privacyUrl": "https://www.agl-aviation.com/privacy",
+    "termsOfUseUrl": "https://www.agl-aviation.com/terms"
+  },
+  "icons": {
+    "color": "icon-color.png",
+    "outline": "icon-outline.png"
+  },
+  "name": {
+    "short": "AGL Maintenance",
+    "full": "AGL Maintenance Tracker - MCT Airfield"
+  },
+  "description": {
+    "short": "Track and manage airfield maintenance tasks",
+    "full": "Complete maintenance tracking system for MCT Airfield. Manage PPM tasks, corrective maintenance, and generate reports. Track due dates, assignments, and task status in real-time."
+  },
+  "accentColor": "#27ae60",
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://your-domain.com/config.html",
+      "canUpdateConfiguration": true,
+      "scopes": [
+        "team",
+        "groupchat"
+      ]
+    }
+  ],
+  "staticTabs": [
+    {
+      "entityId": "maintenancetracker",
+      "name": "Dashboard",
+      "contentUrl": "https://your-domain.com/index.html",
+      "websiteUrl": "https://your-domain.com/index.html",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "your-domain.com",
+    "*.azurewebsites.net",
+    "*.sharepoint.com"
+  ],
+  "webApplicationInfo": {
+    "id": "your-azure-app-id",
+    "resource": "api://your-domain.com/your-azure-app-id"
+  }
+}

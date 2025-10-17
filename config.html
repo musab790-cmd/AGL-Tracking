@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configure AGL Maintenance Tracker</title>
+    <script src="https://res.cdn.office.net/teams-js/2.19.0/js/MicrosoftTeams.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 30px;
+            background: #f5f5f5;
+        }
+        .config-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="config-container">
+        <h1>🛠️ Configure Maintenance Tracker</h1>
+        <p>Set up your maintenance tracking preferences for this channel</p>
+        
+        <div class="form-group">
+            <label>Airfield Location</label>
+            <input type="text" id="location" value="MCT Airfield" placeholder="Enter airfield location">
+        </div>
+        
+        <div class="form-group">
+            <label>Default Shift Type</label>
+            <select id="defaultShift">
+                <option value="A">Shift A</option>
+                <option value="B">Shift B</option>
+                <option value="C">Shift C</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Notification Preference</label>
+            <select id="notifications">
+                <option value="all">All notifications</option>
+                <option value="overdue">Overdue tasks only</option>
+                <option value="none">No notifications</option>
+            </select>
+        </div>
+        
+        <div class="success-message">
+            ✅ Configuration will be saved when you click "Save" below
+        </div>
+    </div>
+
+    <script>
+        microsoftTeams.initialize();
+
+        microsoftTeams.settings.registerOnSaveHandler((saveEvent) => {
+            const location = document.getElementById('location').value;
+            const defaultShift = document.getElementById('defaultShift').value;
+            const notifications = document.getElementById('notifications').value;
+
+            microsoftTeams.settings.setSettings({
+                entityId: 'maintenancetracker',
+                contentUrl: 'https://your-domain.com/index.html',
+                suggestedDisplayName: 'AGL Maintenance Tracker',
+                websiteUrl: 'https://your-domain.com/index.html',
+                removeUrl: 'https://your-domain.com/remove.html'
+            });
+
+            saveEvent.notifySuccess();
+        });
+
+        microsoftTeams.settings.setValidityState(true);
+    </script>
+</body>
+</html>

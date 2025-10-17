@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGL Maintenance Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://res.cdn.office.net/teams-js/2.19.0/js/MicrosoftTeams.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <h1>AGL Maintenance Tracker</h1>
+            <p class="subtitle">MCT Airfield</p>
+        </div>
+        <div class="header-right">
+            <span class="status-indicator online"></span>
+            <span class="status-text">Online</span>
+            <span class="user-name" id="userName">User</span>
+            <span class="user-role" id="userRole">Maintenance Lead</span>
+        </div>
+    </header>
+
+    <!-- Dashboard Cards -->
+    <div class="dashboard">
+        <div class="card card-blue">
+            <div class="card-icon">📅</div>
+            <div class="card-content">
+                <div class="card-value" id="tasksDueToday">0</div>
+                <div class="card-label">PPM TASKS DUE TODAY</div>
+            </div>
+        </div>
+
+        <div class="card card-red">
+            <div class="card-icon">⚠️</div>
+            <div class="card-content">
+                <div class="card-value" id="overdueTasks">0</div>
+                <div class="card-label">OVERDUE PPM TASKS</div>
+            </div>
+        </div>
+
+        <div class="card card-yellow">
+            <div class="card-icon">⏳</div>
+            <div class="card-content">
+                <div class="card-value" id="inProgressTasks">0</div>
+                <div class="card-label">IN PROGRESS TASKS</div>
+            </div>
+        </div>
+
+        <div class="card card-purple">
+            <div class="card-icon">⚙️</div>
+            <div class="card-content">
+                <div class="card-value" id="openCMTasks">0</div>
+                <div class="card-label">OPEN CM TASKS</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+        <button class="btn btn-green" onclick="openAddPPMModal()">Add PPM</button>
+        <button class="btn btn-gray" onclick="showHistory()">History</button>
+        <button class="btn btn-blue" onclick="openAddCMModal()">Add CM</button>
+        <button class="btn btn-purple" onclick="generateReport()">Generate Report</button>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="filters-section">
+        <div class="filter-left">
+            <h2>Preventive Maintenance (PPM)</h2>
+        </div>
+        <div class="filter-right">
+            <select id="shiftFilter" class="filter-select" onchange="filterTasks()">
+                <option value="All">All Shifts</option>
+                <option value="A">Shift A</option>
+                <option value="B">Shift B</option>
+                <option value="C">Shift C</option>
+            </select>
+            <input type="text" id="searchInput" class="search-input" placeholder="Search tasks..." oninput="filterTasks()">
+        </div>
+    </div>
+
+    <!-- Tasks Table -->
+    <div class="tasks-container">
+        <table class="tasks-table">
+            <thead>
+                <tr>
+                    <th>SHIFT TYPE</th>
+                    <th>TASK DESCRIPTION</th>
+                    <th>TYPE</th>
+                    <th>DUE DATE</th>
+                    <th>FREQUENCY</th>
+                    <th>STATUS</th>
+                    <th>DAY SHIFT</th>
+                    <th>NIGHT SHIFT</th>
+                    <th>PHOTO EVIDENCE</th>
+                    <th>ACTION</th>
+                </tr>
+            </thead>
+            <tbody id="tasksTableBody">
+                <!-- Tasks will be loaded here dynamically -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add PPM Modal -->
+    <div id="addPPMModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add/Edit PPM Task</h2>
+                <span class="close" onclick="closeAddPPMModal()">&times;</span>
+            </div>
+            <form id="ppmForm" onsubmit="addPPMTask(event)">
+                <div class="form-group">
+                    <label>Shift Type</label>
+                    <select id="ppmShiftType" required>
+                        <option value="">Select Shift</option>
+                        <option value="A">Shift A</option>
+                        <option value="B">Shift B</option>
+                        <option value="C">Shift C</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Task Description</label>
+                    <input type="text" id="ppmDescription" required>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="ppmType" required>
+                        <option value="PM">PM</option>
+                        <option value="CM">CM</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Due Date</label>
+                    <input type="date" id="ppmDueDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Frequency</label>
+                    <select id="ppmFrequency" required>
+                        <option value="">Select Frequency</option>
+                        <option value="Daily">Daily</option>
+                        <option value="Weekly">Weekly</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Yearly">Yearly</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select id="ppmStatus" required>
+                        <option value="Not Started">Not Started</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                    <small class="form-hint">💡 When you set status to "Completed", the due date will automatically move to the next period based on frequency</small>
+                </div>
+                <div class="form-group">
+                    <label>Day Shift Assignee</label>
+                    <input type="text" id="ppmDayShift" placeholder="Name...">
+                </div>
+                <div class="form-group">
+                    <label>Night Shift Assignee</label>
+                    <input type="text" id="ppmNightShift" placeholder="Name...">
+                </div>
+                
+                <!-- Photo Upload Section -->
+                <div class="form-group photo-upload-section">
+                    <label>📷 Add Photos (Evidence)</label>
+                    <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotoUpload(event)" class="photo-input">
+                    <label for="photoInput" class="photo-upload-btn">
+                        📸 Choose Photos
+                    </label>
+                    <small class="form-hint">You can select multiple photos to upload as evidence for the completed task</small>
+                    <div id="photoPreview" class="photo-preview-container"></div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-gray" onclick="closeAddPPMModal()">Cancel</button>
+                    <button type="submit" class="btn btn-green">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add CM Modal -->
+    <div id="addCMModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Corrective Maintenance Task</h2>
+                <span class="close" onclick="closeAddCMModal()">&times;</span>
+            </div>
+            <form id="cmForm" onsubmit="addCMTask(event)">
+                <div class="form-group">
+                    <label>Issue Description</label>
+                    <textarea id="cmDescription" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Priority</label>
+                    <select id="cmPriority" required>
+                        <option value="">Select Priority</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" id="cmLocation" required>
+                </div>
+                <div class="form-group">
+                    <label>Assigned To</label>
+                    <input type="text" id="cmAssignedTo" placeholder="Name...">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-gray" onclick="closeAddCMModal()">Cancel</button>
+                    <button type="submit" class="btn btn-blue">Save Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Photo View Modal -->
+    <div id="photoViewModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>📷 Task Photos</h2>
+                <span class="close" onclick="closePhotoViewModal()">&times;</span>
+            </div>
+            <div class="photo-view-content">
+                <div id="photoViewContainer" class="photo-view-grid"></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-gray" onclick="closePhotoViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Generation Modal -->
+    <div id="reportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📊 Generate Technical Report</h2>
+                <span class="close" onclick="closeReportModal()">&times;</span>
+            </div>
+            <form onsubmit="event.preventDefault(); generatePDFReport();">
+                <div class="form-group">
+                    <label>Report Period</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 12px; color: #666;">From Date</label>
+                            <input type="date" id="reportDateFrom" required style="width: 100%;">
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; color: #666;">To Date</label>
+                            <input type="date" id="reportDateTo" required style="width: 100%;">
+                        </div>
+                    </div>
+                </div>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0;">
+                    <p style="margin: 0; font-size: 14px; color: #666;">
+                        <strong>📄 PDF Report will include:</strong><br>
+                        • Summary statistics for the period<br>
+                        • Detailed task list with status colors<br>
+                        • Completed, In Progress, and Overdue counts<br>
+                        • Professional formatting for technical reports
+                    </p>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-gray" onclick="closeReportModal()">Cancel</button>
+                    <button type="button" class="btn btn-gray" onclick="exportToCSV()">Export CSV Instead</button>
+                    <button type="submit" class="btn btn-purple">📄 Generate PDF Report</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
