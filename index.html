@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://res.cdn.office.net/teams-js/2.19.0/js/MicrosoftTeams.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <!-- Header -->
@@ -16,8 +20,10 @@
             <p class="subtitle">MCT Airfield</p>
         </div>
         <div class="header-right">
-            <span class="status-indicator online"></span>
-            <span class="status-text">Online</span>
+            <div class="sync-status" id="syncStatus">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span class="status-text" id="statusText">Connecting...</span>
+            </div>
             <span class="user-name" id="userName">User</span>
             <span class="user-role" id="userRole">Maintenance Lead</span>
         </div>
@@ -331,6 +337,10 @@
         </div>
     </div>
 
+    <!-- Firebase Configuration (Load before app.js) -->
+    <script src="firebase-config.js"></script>
+    
+    <!-- Main Application -->
     <script src="app.js"></script>
 </body>
 </html>

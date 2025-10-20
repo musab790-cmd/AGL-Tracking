@@ -1,16 +1,18 @@
-// AGL MCT Airfield Maintenance Tracker - v2.3.1 (PDF REPORT FIX)
-// FIXED: PDF generation notification issue + better date filtering
+// AGL MCT Airfield Maintenance Tracker - v3.0 (FIREBASE SYNC)
+// NEW: Real-time sync across all devices using Firebase
 // Data Storage
 let ppmTasks = [];
 let cmTasks = [];
 let currentEditingTaskId = null;
 let uploadedPhotos = [];
+let isFirebaseReady = false;
+let ppmTasksRef = null;
+let cmTasksRef = null;
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', function() {
-    loadData();
-    updateDashboard();
-    renderTasks();
+    // Initialize Firebase connection
+    initializeFirebase();
     
     // Show shift filter by default (PPM view)
     document.getElementById('shiftFilter').style.display = 'inline-block';
@@ -34,8 +36,106 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Load Data from localStorage
+// Initialize Firebase and setup real-time sync
+function initializeFirebase() {
+    try {
+        // Check if Firebase is loaded
+        if (typeof firebase === 'undefined') {
+            throw new Error('Firebase SDK not loaded');
+        }
+        
+        // Get database references
+        ppmTasksRef = firebase.database().ref('ppmTasks');
+        cmTasksRef = firebase.database().ref('cmTasks');
+        
+        // Setup connection status monitoring
+        const connectedRef = firebase.database().ref('.info/connected');
+        connectedRef.on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                updateSyncStatus('online', 'Synced');
+                console.log('✅ Firebase connected');
+            } else {
+                updateSyncStatus('offline', 'Offline');
+                console.log('❌ Firebase disconnected');
+            }
+        });
+        
+        // Setup real-time listeners for PPM tasks
+        ppmTasksRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                ppmTasks = Object.values(data).filter(task => {
+                    if (!task.dueDate || !isValidDate(task.dueDate)) {
+                        console.warn('Filtered task with invalid date:', task);
+                        return false;
+                    }
+                    return true;
+                });
+            } else {
+                ppmTasks = [];
+            }
+            updateDashboard();
+            if (currentView === 'ppm') {
+                renderTasks();
+            }
+            console.log('📥 PPM tasks synced:', ppmTasks.length);
+        });
+        
+        // Setup real-time listeners for CM tasks
+        cmTasksRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            cmTasks = data ? Object.values(data) : [];
+            updateDashboard();
+            if (currentView === 'cm') {
+                renderCMTasks();
+            }
+            console.log('📥 CM tasks synced:', cmTasks.length);
+        });
+        
+        isFirebaseReady = true;
+        updateSyncStatus('online', 'Synced');
+        console.log('🚀 Firebase initialized successfully!');
+        
+    } catch (error) {
+        console.error('❌ Firebase initialization error:', error);
+        updateSyncStatus('error', 'Sync Error');
+        showNotification('Firebase connection error. Please check firebase-config.js', 'error');
+        
+        // Fallback to localStorage
+        loadData();
+        updateDashboard();
+        renderTasks();
+    }
+}
+
+// Update sync status indicator
+function updateSyncStatus(status, text) {
+    const indicator = document.getElementById('statusIndicator');
+    const statusText = document.getElementById('statusText');
+    
+    if (!indicator || !statusText) return;
+    
+    // Remove all status classes
+    indicator.className = 'status-indicator';
+    
+    // Add appropriate class
+    if (status === 'online') {
+        indicator.classList.add('online');
+        statusText.style.color = '#2ecc71';
+    } else if (status === 'offline') {
+        indicator.classList.add('offline');
+        statusText.style.color = '#e74c3c';
+    } else if (status === 'error') {
+        indicator.classList.add('error');
+        statusText.style.color = '#e74c3c';
+    }
+    
+    statusText.textContent = text;
+}
+
+// Load Data from localStorage (Fallback only)
 function loadData() {
+    console.log('⚠️ Loading from localStorage (fallback mode)');
     const savedPPM = localStorage.getItem('agl_ppm_tasks');
     const savedCM = localStorage.getItem('agl_cm_tasks');
     
@@ -72,8 +172,34 @@ function isValidDate(dateString) {
     return date instanceof Date && !isNaN(date) && dateString.match(/^\d{4}-\d{2}-\d{2}$/);
 }
 
-// Save Data to localStorage
+// Save Data to Firebase (with localStorage backup)
 function saveData() {
+    if (isFirebaseReady && ppmTasksRef && cmTasksRef) {
+        // Save to Firebase
+        try {
+            // Convert arrays to objects with task IDs as keys
+            const ppmObj = {};
+            ppmTasks.forEach(task => {
+                ppmObj[task.id] = task;
+            });
+            
+            const cmObj = {};
+            cmTasks.forEach(task => {
+                cmObj[task.id] = task;
+            });
+            
+            ppmTasksRef.set(ppmObj);
+            cmTasksRef.set(cmObj);
+            
+            console.log('💾 Data saved to Firebase');
+            updateSyncStatus('online', 'Synced');
+        } catch (error) {
+            console.error('Error saving to Firebase:', error);
+            updateSyncStatus('error', 'Sync Error');
+        }
+    }
+    
+    // Always backup to localStorage
     localStorage.setItem('agl_ppm_tasks', JSON.stringify(ppmTasks));
     localStorage.setItem('agl_cm_tasks', JSON.stringify(cmTasks));
 }
