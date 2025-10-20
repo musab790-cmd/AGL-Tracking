@@ -8,6 +8,7 @@ let uploadedPhotos = [];
 let isFirebaseReady = false;
 let ppmTasksRef = null;
 let cmTasksRef = null;
+let isSyncing = false; // Flag to prevent listener loops
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', function() {
@@ -62,6 +63,12 @@ function initializeFirebase() {
         
         // Setup real-time listeners for PPM tasks
         ppmTasksRef.on('value', (snapshot) => {
+            // Skip if we're currently syncing to prevent loops
+            if (isSyncing) {
+                console.log('⏸️ Skipping listener (sync in progress)');
+                return;
+            }
+            
             const data = snapshot.val();
             if (data) {
                 ppmTasks = Object.values(data).filter(task => {
@@ -78,18 +85,24 @@ function initializeFirebase() {
             if (currentView === 'ppm') {
                 renderTasks();
             }
-            console.log('📥 PPM tasks synced:', ppmTasks.length);
+            console.log('📥 PPM tasks synced from Firebase:', ppmTasks.length);
         });
         
         // Setup real-time listeners for CM tasks
         cmTasksRef.on('value', (snapshot) => {
+            // Skip if we're currently syncing to prevent loops
+            if (isSyncing) {
+                console.log('⏸️ Skipping CM listener (sync in progress)');
+                return;
+            }
+            
             const data = snapshot.val();
             cmTasks = data ? Object.values(data) : [];
             updateDashboard();
             if (currentView === 'cm') {
                 renderCMTasks();
             }
-            console.log('📥 CM tasks synced:', cmTasks.length);
+            console.log('📥 CM tasks synced from Firebase:', cmTasks.length);
         });
         
         isFirebaseReady = true;
@@ -173,10 +186,13 @@ function isValidDate(dateString) {
 }
 
 // Save Data to Firebase (with localStorage backup)
-function saveData() {
+async function saveData() {
     if (isFirebaseReady && ppmTasksRef && cmTasksRef) {
         // Save to Firebase
         try {
+            // Set sync flag to prevent listener loops
+            isSyncing = true;
+            
             // Convert arrays to objects with task IDs as keys
             const ppmObj = {};
             ppmTasks.forEach(task => {
@@ -188,14 +204,27 @@ function saveData() {
                 cmObj[task.id] = task;
             });
             
-            ppmTasksRef.set(ppmObj);
-            cmTasksRef.set(cmObj);
+            // Use Promise.all to ensure both writes complete
+            await Promise.all([
+                ppmTasksRef.set(ppmObj),
+                cmTasksRef.set(cmObj)
+            ]);
             
-            console.log('💾 Data saved to Firebase');
+            console.log('💾 Data saved to Firebase successfully');
+            console.log('   - PPM Tasks:', ppmTasks.length);
+            console.log('   - CM Tasks:', cmTasks.length);
             updateSyncStatus('online', 'Synced');
+            
+            // Reset sync flag after a short delay to allow Firebase to propagate
+            setTimeout(() => {
+                isSyncing = false;
+                console.log('✅ Sync flag cleared');
+            }, 1000);
+            
         } catch (error) {
-            console.error('Error saving to Firebase:', error);
+            console.error('❌ Error saving to Firebase:', error);
             updateSyncStatus('error', 'Sync Error');
+            isSyncing = false;
         }
     }
     
