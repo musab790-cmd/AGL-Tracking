@@ -1,20 +1,19 @@
-// Firebase Configuration
-// IMPORTANT: Replace these values with your own Firebase project credentials
+// Firebase Configuration for AGL Maintenance Tracker
+// Using Firebase v8 compat syntax (required for your app)
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY_HERE",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCCjDHGaAFnXP05CaswFEh3OlRMMrqQmN8",
+  authDomain: "agl-tracking-26r.firebaseapp.com",
+  databaseURL: "https://agl-tracking-26r-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "agl-tracking-26r",
+  storageBucket: "agl-tracking-26r.firebasestorage.app",
+  messagingSenderId: "78066725789",
+  appId: "1:78066725789:web:742370c20d055414feb574",
+  measurementId: "G-GVJ65XM3ED"
 };
 
-// Initialize Firebase
+// Initialize Firebase (v8 compat syntax)
 firebase.initializeApp(firebaseConfig);
 
-// Get database reference
-const database = firebase.database();
-
-console.log('Firebase initialized successfully!');
+console.log('✅ Firebase config loaded for AGL Tracking');
+console.log('📍 Database URL:', firebaseConfig.databaseURL);
