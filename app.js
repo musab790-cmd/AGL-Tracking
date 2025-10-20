@@ -5,6 +5,7 @@ let ppmTasks = [];
 let cmTasks = [];
 let currentEditingTaskId = null;
 let uploadedPhotos = [];
+let uploadedCMPhotos = []; // For CM task photos
 let isFirebaseReady = false;
 let ppmTasksRef = null;
 let cmTasksRef = null;
@@ -413,7 +414,7 @@ function renderCMTasks(tasksToRender = cmTasks) {
     tbody.innerHTML = '';
     
     if (tasksToRender.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No CM tasks found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px;">No CM tasks found</td></tr>';
         return;
     }
     
@@ -458,6 +459,12 @@ function renderCMTasks(tasksToRender = cmTasks) {
                 break;
         }
         
+        // Photo indicator
+        const photoCount = task.photos ? task.photos.length : 0;
+        const photoIndicator = photoCount > 0 
+            ? `<button class="photo-indicator" onclick="viewCMPhotos(${task.id})" title="View ${photoCount} photo(s)">📷 ${photoCount}</button>`
+            : '<span style="color: #999;">No photos</span>';
+        
         row.innerHTML = `
             <td><strong>${task.workOrder || 'N/A'}</strong></td>
             <td>${task.description || 'No description'}</td>
@@ -467,6 +474,7 @@ function renderCMTasks(tasksToRender = cmTasks) {
             <td>${formatDate(task.dateReported)}</td>
             <td><span class="status-badge ${statusClass}">${task.status || 'N/A'}</span></td>
             <td>${task.assignedTo || 'Unassigned'}</td>
+            <td>${photoIndicator}</td>
             <td>
                 <div class="action-buttons">
                     <button class="btn-edit" onclick="editCMTask(${task.id})">Edit</button>
@@ -525,6 +533,7 @@ function editCMTask(taskId) {
     if (!task) return;
     
     window.currentEditingCMTaskId = taskId;
+    uploadedCMPhotos = task.photos ? [...task.photos] : [];
     
     document.getElementById('cmWorkOrder').value = task.workOrder || '';
     document.getElementById('cmDescription').value = task.description || '';
@@ -541,6 +550,7 @@ function editCMTask(taskId) {
     document.getElementById('cmPriority').value = task.priority || 'Medium';
     document.getElementById('cmLocation').value = task.location || '';
     
+    displayCMPhotoPreview();
     document.getElementById('addCMModal').style.display = 'block';
 }
 
@@ -707,17 +717,21 @@ function closeAddPPMModal() {
 }
 
 function openAddCMModal() {
+    uploadedCMPhotos = [];
     document.getElementById('addCMModal').style.display = 'block';
     document.getElementById('cmForm').reset();
     // Set today's date as default for date reported
     document.getElementById('cmDateReported').value = new Date().toISOString().split('T')[0];
     // Set default status to Open
     document.getElementById('cmStatus').value = 'Open';
+    document.getElementById('cmPhotoPreview').innerHTML = '';
+    document.getElementById('cmPhotoInput').value = '';
 }
 
 function closeAddCMModal() {
     document.getElementById('addCMModal').style.display = 'none';
     document.getElementById('cmForm').reset();
+    uploadedCMPhotos = [];
 }
 
 // Close modal when clicking outside
@@ -801,6 +815,64 @@ function viewPhotos(taskId) {
 
 function closePhotoViewModal() {
     document.getElementById('photoViewModal').style.display = 'none';
+}
+
+// Handle CM Photo Upload
+function handleCMPhotoUpload(event) {
+    const files = event.target.files;
+    
+    for (let file of files) {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                uploadedCMPhotos.push({
+                    name: file.name,
+                    data: e.target.result,
+                    timestamp: new Date().toISOString()
+                });
+                displayCMPhotoPreview();
+            };
+            
+            reader.readAsDataURL(file);
+        }
+    }
+}
+
+// Display CM Photo Preview
+function displayCMPhotoPreview() {
+    const container = document.getElementById('cmPhotoPreview');
+    container.innerHTML = uploadedCMPhotos.map((photo, index) => `
+        <div class="photo-preview-item">
+            <img src="${photo.data}" alt="${photo.name}">
+            <button class="remove-photo-btn" onclick="removeCMPhoto(${index})" type="button">×</button>
+        </div>
+    `).join('');
+}
+
+// Remove CM Photo
+function removeCMPhoto(index) {
+    uploadedCMPhotos.splice(index, 1);
+    displayCMPhotoPreview();
+}
+
+// View CM Photos Modal
+function viewCMPhotos(taskId) {
+    const task = cmTasks.find(t => t.id === taskId);
+    if (!task || !task.photos || task.photos.length === 0) return;
+    
+    const container = document.getElementById('photoViewContainer');
+    container.innerHTML = task.photos.map(photo => `
+        <div class="photo-view-item">
+            <img src="${photo.data}" alt="${photo.name}">
+            <p class="photo-info">
+                <strong>${photo.name}</strong><br>
+                <small>Uploaded: ${new Date(photo.timestamp).toLocaleString()}</small>
+            </p>
+        </div>
+    `).join('');
+    
+    document.getElementById('photoViewModal').style.display = 'block';
 }
 
 // Add PPM Task
@@ -893,6 +965,7 @@ function addCMTask(event) {
                 assignedTo: document.getElementById('cmAssignedTo').value,
                 priority: document.getElementById('cmPriority').value,
                 location: document.getElementById('cmLocation').value,
+                photos: uploadedCMPhotos,
                 createdDate: cmTasks[taskIndex].createdDate,
                 lastModified: new Date().toISOString()
             };
@@ -911,6 +984,7 @@ function addCMTask(event) {
             assignedTo: document.getElementById('cmAssignedTo').value,
             priority: document.getElementById('cmPriority').value,
             location: document.getElementById('cmLocation').value,
+            photos: uploadedCMPhotos,
             createdDate: new Date().toISOString()
         };
         
@@ -1020,23 +1094,29 @@ async function generatePDFReport() {
         return;
     }
     
-    // Filter tasks by date range
-    const filteredTasks = ppmTasks.filter(task => {
+    // Filter PPM tasks by date range
+    const filteredPPMTasks = ppmTasks.filter(task => {
         return task.dueDate >= dateFrom && task.dueDate <= dateTo;
     });
     
-    // ✅ FIXED: Only show notification if really no tasks, not before PDF generation
-    if (filteredTasks.length === 0) {
+    // Filter CM tasks by date range (using dateReported)
+    const filteredCMTasks = cmTasks.filter(task => {
+        return task.dateReported >= dateFrom && task.dateReported <= dateTo;
+    });
+    
+    // ✅ Check if any tasks found
+    const totalTasks = filteredPPMTasks.length + filteredCMTasks.length;
+    if (totalTasks === 0) {
         showNotification(`No tasks found between ${formatDate(dateFrom)} and ${formatDate(dateTo)}. Try a wider date range.`, 'info');
         return;
     }
     
     // Show generating message
-    showNotification(`Generating PDF for ${filteredTasks.length} task(s)...`, 'info');
+    showNotification(`Generating PDF for ${filteredPPMTasks.length} PPM and ${filteredCMTasks.length} CM task(s)...`, 'info');
     
     // Generate PDF using jsPDF
     try {
-        await generatePDFDocument(filteredTasks, dateFrom, dateTo);
+        await generatePDFDocument(filteredPPMTasks, filteredCMTasks, dateFrom, dateTo);
         showNotification('PDF report generated successfully!', 'success');
         closeReportModal();
     } catch (error) {
@@ -1045,8 +1125,8 @@ async function generatePDFReport() {
     }
 }
 
-// Generate PDF Document
-async function generatePDFDocument(tasks, dateFrom, dateTo) {
+// Generate PDF Document with both PPM and CM tasks and photos
+async function generatePDFDocument(ppmTasks, cmTasks, dateFrom, dateTo) {
     // Load jsPDF library if not loaded
     if (typeof window.jspdf === 'undefined') {
         await loadJsPDF();
@@ -1076,233 +1156,110 @@ async function generatePDFDocument(tasks, dateFrom, dateTo) {
     yPos += 6;
     doc.text(`Generated: ${new Date().toLocaleString()}`, 14, yPos);
     yPos += 6;
-    doc.text(`Total Tasks: ${tasks.length}`, 14, yPos);
+    doc.text(`Total PPM Tasks: ${ppmTasks.length} | Total CM Tasks: ${cmTasks.length}`, 14, yPos);
     yPos += 10;
     
-    // Summary Statistics
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('SUMMARY', 14, yPos);
-    yPos += 8;
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
-    const completed = tasks.filter(t => t.status === 'Completed').length;
-    const inProgress = tasks.filter(t => t.status === 'In Progress').length;
-    const notStarted = tasks.filter(t => t.status === 'Not Started').length;
-    const overdue = tasks.filter(t => {
-        const today = new Date().toISOString().split('T')[0];
-        return t.dueDate < today && t.status !== 'Completed';
-    }).length;
-    
-    doc.text(`✓ Completed: ${completed}`, 14, yPos);
-    yPos += 6;
-    doc.text(`⏳ In Progress: ${inProgress}`, 14, yPos);
-    yPos += 6;
-    doc.text(`○ Not Started: ${notStarted}`, 14, yPos);
-    yPos += 6;
-    doc.text(`⚠ Overdue: ${overdue}`, 14, yPos);
-    yPos += 6;
-    
-    // Count tasks with photos
-    const tasksWithPhotos = tasks.filter(t => t.photos && t.photos.length > 0).length;
-    doc.text(`📷 Tasks with Photos: ${tasksWithPhotos}`, 14, yPos);
-    yPos += 6;
-    
-    // Count recently completed tasks (last 7 days)
-    const recentlyCompleted = tasks.filter(t => {
-        if (!t.lastCompleted) return false;
-        const daysSince = Math.floor((new Date() - new Date(t.lastCompleted)) / (1000 * 60 * 60 * 24));
-        return daysSince <= 7;
-    }).length;
-    doc.text(`✅ Recently Completed (Last 7 days): ${recentlyCompleted}`, 14, yPos);
-    yPos += 12;
-    
-    // Recent Updates Section
-    if (recentlyCompleted > 0) {
+    // Summary Statistics for PPM
+    if (ppmTasks.length > 0) {
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
-        doc.text('RECENT UPDATES', 14, yPos);
+        doc.text('PPM TASKS SUMMARY', 14, yPos);
         yPos += 8;
         
-        doc.setFontSize(8);
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         
-        const recentTasks = tasks
-            .filter(t => t.lastCompleted)
-            .sort((a, b) => new Date(b.lastCompleted) - new Date(a.lastCompleted))
-            .slice(0, 5); // Show top 5 most recent updates
+        const completed = ppmTasks.filter(t => t.status === 'Completed').length;
+        const inProgress = ppmTasks.filter(t => t.status === 'In Progress').length;
+        const notStarted = ppmTasks.filter(t => t.status === 'Not Started').length;
+        const overdue = ppmTasks.filter(t => {
+            const today = new Date().toISOString().split('T')[0];
+            return t.dueDate < today && t.status !== 'Completed';
+        }).length;
+        const tasksWithPhotos = ppmTasks.filter(t => t.photos && t.photos.length > 0).length;
         
-        for (const task of recentTasks) {
-            const daysSince = Math.floor((new Date() - new Date(task.lastCompleted)) / (1000 * 60 * 60 * 24));
-            const timeAgo = daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday' : `${daysSince} days ago`;
-            
-            const description = task.description || 'No description';
-            const truncatedDesc = description.length > 45 ? description.substring(0, 42) + '...' : description;
-            
-            doc.text(`• ${timeAgo}: ${truncatedDesc}`, 14, yPos);
-            yPos += 5;
-        }
-        
-        yPos += 7;
+        doc.text(`✓ Completed: ${completed}`, 14, yPos);
+        doc.text(`⏳ In Progress: ${inProgress}`, 80, yPos);
+        yPos += 6;
+        doc.text(`○ Not Started: ${notStarted}`, 14, yPos);
+        doc.text(`⚠ Overdue: ${overdue}`, 80, yPos);
+        yPos += 6;
+        doc.text(`📷 Tasks with Photos: ${tasksWithPhotos}`, 14, yPos);
+        yPos += 10;
     }
     
-    // Task Details Table
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('TASK DETAILS', 14, yPos);
-    yPos += 8;
-    
-    // Process tasks one by one with detailed information
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    
-    for (let i = 0; i < tasks.length; i++) {
-        const task = tasks[i];
+    // Summary Statistics for CM
+    if (cmTasks.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('CM TASKS SUMMARY', 14, yPos);
+        yPos += 8;
         
-        // Check if we need a new page (need more space for detailed entries)
-        if (yPos > pageHeight - 40) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        const open = cmTasks.filter(t => t.status === 'Open').length;
+        const inProgress = cmTasks.filter(t => t.status === 'In Progress').length;
+        const pendingParts = cmTasks.filter(t => t.status === 'Pending Parts').length;
+        const resolved = cmTasks.filter(t => t.status === 'Resolved').length;
+        const highPriority = cmTasks.filter(t => t.priority === 'High' || t.priority === 'Critical').length;
+        const tasksWithPhotos = cmTasks.filter(t => t.photos && t.photos.length > 0).length;
+        
+        doc.text(`🔴 Open: ${open}`, 14, yPos);
+        doc.text(`⏳ In Progress: ${inProgress}`, 80, yPos);
+        yPos += 6;
+        doc.text(`⏸ Pending Parts: ${pendingParts}`, 14, yPos);
+        doc.text(`✓ Resolved: ${resolved}`, 80, yPos);
+        yPos += 6;
+        doc.text(`⚠ High Priority: ${highPriority}`, 14, yPos);
+        doc.text(`📷 Tasks with Photos: ${tasksWithPhotos}`, 80, yPos);
+        yPos += 12;
+    }
+    
+    // PPM Task Details
+    if (ppmTasks.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('PPM TASKS DETAILS', 14, yPos);
+        yPos += 10;
+    
+        for (let i = 0; i < ppmTasks.length; i++) {
+            const task = ppmTasks[i];
+            
+            // Check if we need a new page
+            if (yPos > pageHeight - 80) {
+                doc.addPage();
+                yPos = 20;
+            }
+            
+            yPos = await renderTaskInPDF(doc, task, i + 1, 'PPM', yPos, pageWidth, pageHeight);
+        }
+    }
+    
+    // CM Task Details
+    if (cmTasks.length > 0) {
+        // Check if we need a new page for CM section
+        if (yPos > pageHeight - 80) {
             doc.addPage();
             yPos = 20;
         }
         
-        // Get smart status for color
-        const smartStatus = getSmartStatus(task);
-        
-        // Task Number Header
-        doc.setFontSize(10);
+        doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text(`TASK ${i + 1}`, 14, yPos);
-        yPos += 6;
+        doc.text('CM TASKS DETAILS', 14, yPos);
+        yPos += 10;
         
-        // Draw box around task details
-        const boxStartY = yPos - 2;
-        const boxHeight = 30; // Adjust based on content
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.rect(14, boxStartY, pageWidth - 28, boxHeight);
-        
-        // Task Information - Left Column
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Description:', 16, yPos);
-        doc.setFont('helvetica', 'normal');
-        const description = task.description || 'No description';
-        const truncatedDesc = description.length > 55 ? description.substring(0, 52) + '...' : description;
-        doc.text(truncatedDesc, 42, yPos);
-        yPos += 5;
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('Shift:', 16, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(task.shiftType || 'N/A', 42, yPos);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('Type:', 70, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(task.type || 'N/A', 85, yPos);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('Frequency:', 110, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(task.frequency || 'N/A', 135, yPos);
-        yPos += 5;
-        
-        // Task Status with Color
-        doc.setFont('helvetica', 'bold');
-        doc.text('Status:', 16, yPos);
-        
-        // Set color based on status
-        switch(smartStatus.class) {
-            case 'status-overdue':
-                doc.setTextColor(220, 53, 69); // Red
-                break;
-            case 'status-due-today':
-                doc.setTextColor(255, 153, 0); // Orange
-                break;
-            case 'status-completed':
-                doc.setTextColor(40, 167, 69); // Green
-                break;
-            case 'status-in-progress':
-                doc.setTextColor(0, 123, 255); // Blue
-                break;
-            case 'status-upcoming':
-                doc.setTextColor(255, 193, 7); // Yellow
-                break;
-            default:
-                doc.setTextColor(108, 117, 125); // Gray
-        }
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${smartStatus.badge} ${smartStatus.text}`, 42, yPos);
-        doc.setTextColor(0, 0, 0); // Reset to black
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('Due Date:', 110, yPos);
-        doc.setFont('helvetica', 'normal');
-        doc.text(formatDate(task.dueDate), 135, yPos);
-        yPos += 5;
-        
-        // Update History Section
-        doc.setFont('helvetica', 'bold');
-        doc.text('Assignments:', 16, yPos);
-        doc.setFont('helvetica', 'normal');
-        const dayShift = task.dayShift || 'Not assigned';
-        const nightShift = task.nightShift || 'Not assigned';
-        doc.text(`Day: ${dayShift}`, 42, yPos);
-        doc.text(`Night: ${nightShift}`, 110, yPos);
-        yPos += 5;
-        
-        // Photo Evidence
-        doc.setFont('helvetica', 'bold');
-        doc.text('Photos:', 16, yPos);
-        doc.setFont('helvetica', 'normal');
-        const photoCount = task.photos ? task.photos.length : 0;
-        doc.text(`${photoCount} photo(s) attached`, 42, yPos);
-        
-        // Last Completed
-        if (task.lastCompleted) {
-            doc.setFont('helvetica', 'bold');
-            doc.text('Last Completed:', 110, yPos);
-            doc.setFont('helvetica', 'normal');
-            const lastCompleted = new Date(task.lastCompleted).toLocaleDateString();
-            doc.text(lastCompleted, 145, yPos);
-        }
-        yPos += 5;
-        
-        // Additional Update Info
-        doc.setFontSize(7);
-        doc.setTextColor(100, 100, 100);
-        let updateInfo = '';
-        
-        if (task.lastCompleted) {
-            const daysSince = Math.floor((new Date() - new Date(task.lastCompleted)) / (1000 * 60 * 60 * 24));
-            const timeAgo = daysSince === 0 ? 'today' : daysSince === 1 ? 'yesterday' : `${daysSince} days ago`;
-            updateInfo += `Last update: Completed ${timeAgo}`;
-        }
-        
-        if (photoCount > 0) {
-            if (updateInfo) updateInfo += ' | ';
-            const latestPhoto = task.photos && task.photos.length > 0 ? task.photos[task.photos.length - 1] : null;
-            if (latestPhoto && latestPhoto.timestamp) {
-                const photoDays = Math.floor((new Date() - new Date(latestPhoto.timestamp)) / (1000 * 60 * 60 * 24));
-                const photoTimeAgo = photoDays === 0 ? 'today' : photoDays === 1 ? 'yesterday' : `${photoDays} days ago`;
-                updateInfo += `Latest photo uploaded ${photoTimeAgo}`;
-            } else {
-                updateInfo += `${photoCount} photo(s) attached`;
+        for (let i = 0; i < cmTasks.length; i++) {
+            const task = cmTasks[i];
+            
+            // Check if we need a new page
+            if (yPos > pageHeight - 80) {
+                doc.addPage();
+                yPos = 20;
             }
+            
+            yPos = await renderCMTaskInPDF(doc, task, i + 1, yPos, pageWidth, pageHeight);
         }
-        
-        if (!updateInfo) {
-            updateInfo = 'No recent updates';
-        }
-        
-        doc.text(updateInfo, 16, yPos);
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(8);
-        
-        yPos += 8; // Space before next task
     }
     
     // Footer
@@ -1318,6 +1275,254 @@ async function generatePDFDocument(tasks, dateFrom, dateTo) {
     // Save PDF
     const fileName = `AGL_Maintenance_Report_${dateFrom}_to_${dateTo}.pdf`;
     doc.save(fileName);
+}
+
+// Render PPM Task in PDF with photos
+async function renderTaskInPDF(doc, task, taskNum, type, yPos, pageWidth, pageHeight) {
+    const smartStatus = getSmartStatus(task);
+    
+    // Task Number Header
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`PPM TASK ${taskNum}`, 14, yPos);
+    yPos += 6;
+    
+    // Draw box around task
+    const boxStartY = yPos - 2;
+    let boxHeight = 35;
+    
+    // Task Information
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    const description = task.description || 'No description';
+    const truncatedDesc = description.length > 55 ? description.substring(0, 52) + '...' : description;
+    doc.text(truncatedDesc, 42, yPos);
+    yPos += 5;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Shift:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.shiftType || 'N/A', 42, yPos);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Type:', 70, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.type || 'N/A', 85, yPos);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Frequency:', 110, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.frequency || 'N/A', 135, yPos);
+    yPos += 5;
+    
+    // Status with Color
+    doc.setFont('helvetica', 'bold');
+    doc.text('Status:', 16, yPos);
+    
+    switch(smartStatus.class) {
+        case 'status-overdue':
+            doc.setTextColor(220, 53, 69);
+            break;
+        case 'status-due-today':
+            doc.setTextColor(255, 153, 0);
+            break;
+        case 'status-completed':
+            doc.setTextColor(40, 167, 69);
+            break;
+        case 'status-in-progress':
+            doc.setTextColor(0, 123, 255);
+            break;
+        case 'status-upcoming':
+            doc.setTextColor(255, 193, 7);
+            break;
+        default:
+            doc.setTextColor(108, 117, 125);
+    }
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${smartStatus.badge} ${smartStatus.text}`, 42, yPos);
+    doc.setTextColor(0, 0, 0);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Due Date:', 110, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatDate(task.dueDate), 135, yPos);
+    yPos += 5;
+    
+    // Assignments
+    doc.setFont('helvetica', 'bold');
+    doc.text('Assignments:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Day: ${task.dayShift || 'Not assigned'}`, 42, yPos);
+    doc.text(`Night: ${task.nightShift || 'Not assigned'}`, 110, yPos);
+    yPos += 5;
+    
+    // Photos section
+    const photoCount = task.photos ? task.photos.length : 0;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Photos:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${photoCount} attached`, 42, yPos);
+    yPos += 5;
+    
+    // Display photo thumbnails if available
+    if (photoCount > 0) {
+        const photos = task.photos.slice(0, 3); // Show max 3 photos
+        const photoSize = 25; // Medium size thumbnails
+        let photoX = 16;
+        
+        for (let i = 0; i < photos.length; i++) {
+            try {
+                doc.addImage(photos[i].data, 'JPEG', photoX, yPos, photoSize, photoSize);
+                photoX += photoSize + 2;
+            } catch (error) {
+                console.error('Error adding photo to PDF:', error);
+            }
+        }
+        yPos += photoSize + 3;
+        boxHeight += photoSize + 3;
+        
+        if (photoCount > 3) {
+            doc.setFontSize(7);
+            doc.setTextColor(128, 128, 128);
+            doc.text(`+${photoCount - 3} more photo(s)`, 16, yPos);
+            doc.setTextColor(0, 0, 0);
+            yPos += 3;
+            boxHeight += 3;
+        }
+    }
+    
+    // Draw the box
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(14, boxStartY, pageWidth - 28, boxHeight);
+    
+    doc.setFontSize(8);
+    yPos += 3;
+    
+    return yPos;
+}
+
+// Render CM Task in PDF with photos
+async function renderCMTaskInPDF(doc, task, taskNum, yPos, pageWidth, pageHeight) {
+    // Task Number Header
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`CM TASK ${taskNum} - WO: ${task.workOrder || 'N/A'}`, 14, yPos);
+    yPos += 6;
+    
+    // Draw box around task
+    const boxStartY = yPos - 2;
+    let boxHeight = 35;
+    
+    // Task Information
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Description:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    const description = task.description || 'No description';
+    const truncatedDesc = description.length > 55 ? description.substring(0, 52) + '...' : description;
+    doc.text(truncatedDesc, 42, yPos);
+    yPos += 5;
+    
+    // Priority with color
+    doc.setFont('helvetica', 'bold');
+    doc.text('Priority:', 16, yPos);
+    
+    switch(task.priority) {
+        case 'High':
+        case 'Critical':
+            doc.setTextColor(220, 53, 69);
+            break;
+        case 'Medium':
+            doc.setTextColor(255, 153, 0);
+            break;
+        case 'Low':
+            doc.setTextColor(0, 123, 255);
+            break;
+        default:
+            doc.setTextColor(108, 117, 125);
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.text(task.priority || 'N/A', 42, yPos);
+    doc.setTextColor(0, 0, 0);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Location:', 70, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.location || 'N/A', 95, yPos);
+    yPos += 5;
+    
+    // Status
+    doc.setFont('helvetica', 'bold');
+    doc.text('Status:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.status || 'N/A', 42, yPos);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Reported:', 110, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatDate(task.dateReported), 135, yPos);
+    yPos += 5;
+    
+    // People
+    doc.setFont('helvetica', 'bold');
+    doc.text('Reported By:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.reportedBy || 'N/A', 42, yPos);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text('Assigned To:', 110, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.assignedTo || 'Unassigned', 138, yPos);
+    yPos += 5;
+    
+    // Photos section
+    const photoCount = task.photos ? task.photos.length : 0;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Photos:', 16, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${photoCount} attached`, 42, yPos);
+    yPos += 5;
+    
+    // Display photo thumbnails if available
+    if (photoCount > 0) {
+        const photos = task.photos.slice(0, 3); // Show max 3 photos
+        const photoSize = 25; // Medium size thumbnails
+        let photoX = 16;
+        
+        for (let i = 0; i < photos.length; i++) {
+            try {
+                doc.addImage(photos[i].data, 'JPEG', photoX, yPos, photoSize, photoSize);
+                photoX += photoSize + 2;
+            } catch (error) {
+                console.error('Error adding photo to PDF:', error);
+            }
+        }
+        yPos += photoSize + 3;
+        boxHeight += photoSize + 3;
+        
+        if (photoCount > 3) {
+            doc.setFontSize(7);
+            doc.setTextColor(128, 128, 128);
+            doc.text(`+${photoCount - 3} more photo(s)`, 16, yPos);
+            doc.setTextColor(0, 0, 0);
+            yPos += 3;
+            boxHeight += 3;
+        }
+    }
+    
+    // Draw the box
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(14, boxStartY, pageWidth - 28, boxHeight);
+    
+    doc.setFontSize(8);
+    yPos += 3;
+    
+    return yPos;
 }
 
 // Load jsPDF library dynamically

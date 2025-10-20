@@ -135,6 +135,7 @@
                     <th>DATE REPORTED</th>
                     <th>STATUS</th>
                     <th>ASSIGNED TO</th>
+                    <th>PHOTOS</th>
                     <th>ACTION</th>
                 </tr>
             </thead>
@@ -276,6 +277,18 @@
                     <label>Assigned To</label>
                     <input type="text" id="cmAssignedTo" placeholder="Name...">
                 </div>
+                
+                <!-- Photo Upload Section for CM -->
+                <div class="form-group photo-upload-section">
+                    <label>📷 Add Photos (Evidence)</label>
+                    <input type="file" id="cmPhotoInput" accept="image/*" multiple onchange="handleCMPhotoUpload(event)" class="photo-input">
+                    <label for="cmPhotoInput" class="photo-upload-btn">
+                        📸 Choose Photos
+                    </label>
+                    <small class="form-hint">Add photos of the issue, work in progress, or completed repairs</small>
+                    <div id="cmPhotoPreview" class="photo-preview-container"></div>
+                </div>
+                
                 <div class="modal-actions">
                     <button type="button" class="btn btn-gray" onclick="closeAddCMModal()">Cancel</button>
                     <button type="submit" class="btn btn-blue">Save Task</button>
