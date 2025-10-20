@@ -9,6 +9,7 @@ let isFirebaseReady = false;
 let ppmTasksRef = null;
 let cmTasksRef = null;
 let isSyncing = false; // Flag to prevent listener loops
+let currentView = 'ppm'; // Track current view (ppm or cm)
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', function() {
@@ -406,6 +407,80 @@ function renderTasks(tasksToRender = ppmTasks) {
     });
 }
 
+// Render CM Tasks
+function renderCMTasks(tasksToRender = cmTasks) {
+    const tbody = document.getElementById('cmTasksTableBody');
+    tbody.innerHTML = '';
+    
+    if (tasksToRender.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No CM tasks found</td></tr>';
+        return;
+    }
+    
+    tasksToRender.forEach(task => {
+        const row = document.createElement('tr');
+        
+        // Determine status color
+        let statusClass = '';
+        switch(task.status) {
+            case 'Open':
+                statusClass = 'status-overdue';
+                break;
+            case 'In Progress':
+                statusClass = 'status-progress';
+                break;
+            case 'Pending Parts':
+                statusClass = 'status-upcoming';
+                break;
+            case 'Completed':
+                statusClass = 'status-completed';
+                break;
+            case 'Closed':
+                statusClass = 'status-not-started';
+                break;
+        }
+        
+        // Determine priority color
+        let priorityColor = '#999';
+        let priorityIcon = '●';
+        switch(task.priority) {
+            case 'High':
+                priorityColor = '#e74c3c';
+                priorityIcon = '⚠️';
+                break;
+            case 'Medium':
+                priorityColor = '#f39c12';
+                priorityIcon = '🔸';
+                break;
+            case 'Low':
+                priorityColor = '#3498db';
+                priorityIcon = '⬇️';
+                break;
+        }
+        
+        row.innerHTML = `
+            <td><strong>${task.workOrder || 'N/A'}</strong></td>
+            <td>${task.description || 'No description'}</td>
+            <td style="color: ${priorityColor}; font-weight: bold;">${priorityIcon} ${task.priority || 'N/A'}</td>
+            <td>${task.location || 'N/A'}</td>
+            <td>${task.reportedBy || 'N/A'}</td>
+            <td>${formatDate(task.dateReported)}</td>
+            <td><span class="status-badge ${statusClass}">${task.status || 'N/A'}</span></td>
+            <td>${task.assignedTo || 'Unassigned'}</td>
+            <td>
+                <div class="action-buttons">
+                    <button class="btn-edit" onclick="editCMTask(${task.id})">Edit</button>
+                    <button class="btn-delete" onclick="deleteCMTask(${task.id})">Delete</button>
+                </div>
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    console.log('📦 Rendered', tasksToRender.length, 'CM tasks');
+}
+
 // Edit Task
 function editTask(taskId) {
     const task = ppmTasks.find(t => t.id === taskId);
@@ -441,6 +516,42 @@ function deleteTask(taskId) {
         updateDashboard();
         renderTasks();
         showNotification('Task deleted successfully!', 'success');
+    }
+}
+
+// Edit CM Task
+function editCMTask(taskId) {
+    const task = cmTasks.find(t => t.id === taskId);
+    if (!task) return;
+    
+    window.currentEditingCMTaskId = taskId;
+    
+    document.getElementById('cmWorkOrder').value = task.workOrder || '';
+    document.getElementById('cmDescription').value = task.description || '';
+    document.getElementById('cmReportedBy').value = task.reportedBy || '';
+    
+    if (isValidDate(task.dateReported)) {
+        document.getElementById('cmDateReported').value = task.dateReported;
+    } else {
+        document.getElementById('cmDateReported').value = new Date().toISOString().split('T')[0];
+    }
+    
+    document.getElementById('cmStatus').value = task.status || 'Open';
+    document.getElementById('cmAssignedTo').value = task.assignedTo || '';
+    document.getElementById('cmPriority').value = task.priority || 'Medium';
+    document.getElementById('cmLocation').value = task.location || '';
+    
+    document.getElementById('addCMModal').style.display = 'block';
+}
+
+// Delete CM Task
+function deleteCMTask(taskId) {
+    if (confirm('Are you sure you want to delete this CM task?')) {
+        cmTasks = cmTasks.filter(t => t.id !== taskId);
+        saveData();
+        updateDashboard();
+        renderCMTasks();
+        showNotification('CM task deleted successfully!', 'success');
     }
 }
 
@@ -534,6 +645,47 @@ function filterCMTasks() {
     }
     
     renderCMTasks(filtered);
+}
+
+// Switch between PPM and CM views
+function switchView(view) {
+    currentView = view;
+    
+    // Update button styles
+    const ppmBtn = document.getElementById('ppmViewBtn');
+    const cmBtn = document.getElementById('cmViewBtn');
+    
+    if (view === 'ppm') {
+        ppmBtn.classList.add('active');
+        cmBtn.classList.remove('active');
+        
+        // Show PPM container, hide CM container
+        document.getElementById('ppmTasksContainer').style.display = 'block';
+        document.getElementById('cmTasksContainer').style.display = 'none';
+        
+        // Show shift filter, hide CM status filter
+        document.getElementById('shiftFilter').style.display = 'inline-block';
+        document.getElementById('cmStatusFilter').style.display = 'none';
+        
+        // Render PPM tasks
+        renderTasks();
+    } else if (view === 'cm') {
+        cmBtn.classList.add('active');
+        ppmBtn.classList.remove('active');
+        
+        // Hide PPM container, show CM container
+        document.getElementById('ppmTasksContainer').style.display = 'none';
+        document.getElementById('cmTasksContainer').style.display = 'block';
+        
+        // Hide shift filter, show CM status filter
+        document.getElementById('shiftFilter').style.display = 'none';
+        document.getElementById('cmStatusFilter').style.display = 'inline-block';
+        
+        // Render CM tasks
+        renderCMTasks();
+    }
+    
+    console.log('📋 Switched to', view.toUpperCase(), 'view');
 }
 
 // Modal Functions
