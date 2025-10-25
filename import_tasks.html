@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Import Tasks</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem}
+    h1{margin-bottom:.25rem}
+    input[type=file]{margin:.5rem 0}
+    table{width:100%;border-collapse:collapse;margin-top:1rem}
+    th,td{border:1px solid #ddd;padding:.5rem;text-align:left}
+    #message{margin-top:.75rem;color:#111}
+    button{margin-right:.5rem}
+  </style>
+</head>
+<body>
+  <h1>Import Tasks</h1>
+  <p>Upload a CSV file with a header row. Expected example headers: <code>title,description,due_date,assignee</code>.</p>
+  <input type="file" id="file" accept=".csv">
+  <div>
+    <button id="parse">Parse & Preview</button>
+    <button id="send" disabled>Send to /api/tasks/import</button>
+  </div>
+  <div id="message" role="status" aria-live="polite"></div>
+  <div id="preview"></div>
+
+  <script>
+    function parseCSV(text) {
+      const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim()!=='');
+      if (lines.length === 0) return [];
+      const headers = lines[0].split(',').map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const cols = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = (cols[i] || '').trim(); });
+        return obj;
+      });
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    document.getElementById('parse').addEventListener('click', () => {
+      const f = document.getElementById('file').files[0];
+      if (!f) { alert('Select a CSV file to parse.'); return; }
+      const r = new FileReader();
+      r.onload = e => {
+        try {
+          const tasks = parseCSV(e.target.result);
+          const preview = document.getElementById('preview');
+          if (!tasks.length) { preview.innerHTML = '<p>No rows found</p>'; document.getElementById('send').disabled = true; return; }
+          const cols = Object.keys(tasks[0]);
+          let html = '<table><thead><tr>' + cols.map(c => '<th>'+escapeHtml(c)+'</th>').join('') + '</tr></thead><tbody>';
+          tasks.forEach(t => {
+            html += '<tr>' + cols.map(c => '<td>'+escapeHtml(t[c])+'</td>').join('') + '</tr>';
+          });
+          html += '</tbody></table>';
+          preview.innerHTML = html;
+          window.__importTasks = tasks;
+          document.getElementById('send').disabled = false;
+          document.getElementById('message').textContent = '';
+        } catch (err) {
+          document.getElementById('message').textContent = 'Error parsing CSV: ' + err.message;
+        }
+      };
+      r.readAsText(f);
+    });
+
+    document.getElementById('send').addEventListener('click', async () => {
+      const tasks = window.__importTasks || [];
+      if (!tasks.length) { alert('No tasks to send.'); return; }
+      try {
+        document.getElementById('send').disabled = true;
+        document.getElementById('message').textContent = 'Sending...';
+        const res = await fetch('/api/tasks/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tasks })
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(res.status + ' ' + text);
+        }
+        const data = await res.json().catch(()=>null);
+        document.getElementById('message').textContent = 'Import successful.' + (data ? ' Response: ' + JSON.stringify(data) : '');
+      } catch (err) {
+        document.getElementById('message').textContent = 'Import failed: ' + err.message;
+      } finally {
+        document.getElementById('send').disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
